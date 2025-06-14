@@ -22,7 +22,7 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
-extern UART_HandleTypeDef huart3;
+
 
 /* USER CODE END INCLUDE */
 
@@ -50,6 +50,83 @@ extern UART_HandleTypeDef huart3;
   */
 
 /* USER CODE BEGIN PRIVATE_TYPES */
+extern UART_HandleTypeDef huart3;
+extern uint8_t rx_data;
+
+USBD_CDC_LineCodingTypeDef LineCoding = {
+  115200,                       /* baud rate */
+  0x00,                         /* stop bits-1 */
+  0x00,                         /* parity - none */
+  0x08                          /* nb. of bits 8 */
+};
+
+
+static void ComPort_Config(UART_HandleTypeDef *UartHandle, uint8_t *data)
+{
+  if (HAL_UART_DeInit(UartHandle) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  switch (LineCoding.format)
+  {
+  case 0:
+    UartHandle->Init.StopBits = UART_STOPBITS_1;
+    break;
+  case 2:
+    UartHandle->Init.StopBits = UART_STOPBITS_2;
+    break;
+  default:
+    UartHandle->Init.StopBits = UART_STOPBITS_1;
+    break;
+  }
+
+  switch (LineCoding.paritytype)
+  {
+  case 0:
+    UartHandle->Init.Parity = UART_PARITY_NONE;
+    break;
+  case 1:
+    UartHandle->Init.Parity = UART_PARITY_ODD;
+    break;
+  case 2:
+    UartHandle->Init.Parity = UART_PARITY_EVEN;
+    break;
+  default:
+    UartHandle->Init.Parity = UART_PARITY_NONE;
+    break;
+  }
+
+  switch (LineCoding.datatype)
+  {
+  case 0x07:
+    UartHandle->Init.WordLength = UART_WORDLENGTH_8B;
+    break;
+  case 0x08:
+    if (UartHandle->Init.Parity == UART_PARITY_NONE)
+      UartHandle->Init.WordLength = UART_WORDLENGTH_8B;
+    else
+      UartHandle->Init.WordLength = UART_WORDLENGTH_9B;
+    break;
+  default:
+    UartHandle->Init.WordLength = UART_WORDLENGTH_8B;
+    break;
+  }
+
+  UartHandle->Init.BaudRate = LineCoding.bitrate;
+  UartHandle->Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  UartHandle->Init.Mode = UART_MODE_TX_RX;
+  UartHandle->Init.OverSampling = UART_OVERSAMPLING_16;
+
+  if (HAL_UART_Init(UartHandle) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  HAL_UART_Receive_IT(UartHandle, data, 1);
+}
+
+
 
 /* USER CODE END PRIVATE_TYPES */
 
@@ -218,12 +295,23 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
   /*                                        4 - Space                            */
   /* 6      | bDataBits  |   1   | Number Data bits (5, 6, 7, 8 or 16).          */
   /*******************************************************************************/
-    case CDC_SET_LINE_CODING:
-
+    case CDC_SET_LINE_CODING: // 0x20
+      LineCoding.bitrate = (uint32_t) (pbuf[0] | (pbuf[1] << 8) |
+                                       (pbuf[2] << 16) | (pbuf[3] << 24));
+      LineCoding.format = pbuf[4];
+      LineCoding.paritytype = pbuf[5];
+      LineCoding.datatype = pbuf[6];
+      ComPort_Config(&huart3, &rx_data);
     break;
 
-    case CDC_GET_LINE_CODING:
-
+    case CDC_GET_LINE_CODING: // 0x21
+      pbuf[0] = (uint8_t) (LineCoding.bitrate);
+      pbuf[1] = (uint8_t) (LineCoding.bitrate >> 8);
+      pbuf[2] = (uint8_t) (LineCoding.bitrate >> 16);
+      pbuf[3] = (uint8_t) (LineCoding.bitrate >> 24);
+      pbuf[4] = LineCoding.format;
+      pbuf[5] = LineCoding.paritytype;
+      pbuf[6] = LineCoding.datatype;
     break;
 
     case CDC_SET_CONTROL_LINE_STATE:
