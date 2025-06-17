@@ -315,7 +315,20 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
     break;
 
     case CDC_SET_CONTROL_LINE_STATE:
+      USBD_SetupReqTypedef *req = (USBD_SetupReqTypedef *)pbuf;
+      uint16_t wValue = req->wValue;
 
+      char dtr = wValue & 0x01; // Bit 0: DTR
+
+      // DTR LED (PA10)
+      if (dtr)
+      {
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET); // LED ON
+      }
+      else
+      {
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);   // LED OFF
+      }
     break;
 
     case CDC_SEND_BREAK:
