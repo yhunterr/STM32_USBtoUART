@@ -52,6 +52,8 @@
 /* USER CODE BEGIN PRIVATE_TYPES */
 extern UART_HandleTypeDef huart3;
 extern uint8_t rx_data;
+extern uint8_t led_tx_flag;
+extern uint32_t led_tx_on_tick;
 
 USBD_CDC_LineCodingTypeDef LineCoding = {
   115200,                       /* baud rate */
@@ -323,11 +325,11 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
       // DTR LED (PA10)
       if (dtr)
       {
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET); // LED ON
+        HAL_GPIO_WritePin(TERMINAL_STATE_GPIO_Port, TERMINAL_STATE_Pin, GPIO_PIN_SET); // LED ON
       }
       else
       {
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);   // LED OFF
+        HAL_GPIO_WritePin(TERMINAL_STATE_GPIO_Port, TERMINAL_STATE_Pin, GPIO_PIN_RESET);   // LED OFF
       }
     break;
 
@@ -363,10 +365,12 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   /* USER CODE BEGIN 6 */
   HAL_UART_Transmit(&huart3, Buf, (uint16_t)(*Len), 100);
 
-  /* USER CODE BEGIN 6 */
-
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+  HAL_GPIO_WritePin(LED_TX_GPIO_Port, LED_TX_Pin, GPIO_PIN_SET);
+  led_tx_flag = 1;
+  led_tx_on_tick = HAL_GetTick();
+
   return (USBD_OK);
   /* USER CODE END 6 */
 }
